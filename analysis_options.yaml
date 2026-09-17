@@ -1,0 +1,167 @@
+# This file configures the analyzer, which statically analyzes Dart code to
+# check for errors, warnings, and lints.
+#
+# Every setting below is verified against this codebase: nothing is declared
+# here that isn't also installed, running, and satisfied. See the project
+# report for the full audit trail.
+
+include: package:flutter_lints/flutter.yaml
+
+# riverpod_lint 3.x is a native `analysis_server_plugin`, not a `custom_lint`
+# plugin: it has no separate CLI, and it is declared here (top level, not
+# under `analyzer:`) rather than added to dev_dependencies' `custom_lint`.
+# The classic `custom_lint` package could not be added to this project at
+# all: it caps out at analyzer ^8.0.0, while build_runner (needed for
+# freezed/auto_route codegen) pulls in analyzer >=13.3.0 <15.0.0, so no
+# version of custom_lint satisfies the resolver. riverpod_lint no longer
+# depends on custom_lint and resolves cleanly on its own.
+#
+# IMPORTANT: `flutter analyze` does not currently surface this plugin's
+# diagnostics (it drives its own embedded `dart language-server` process,
+# which does not forward plugin-contributed diagnostics in this Flutter
+# version). Only the plain `dart analyze` CLI loads and reports from it.
+# Both commands must be run; see the project report for the split of what
+# each one is responsible for.
+plugins:
+  riverpod_lint: 3.1.9
+
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
+    # Generated code is not hand-written; it is not held to hand-written
+    # analysis standards (and freezed/auto_route output would fail several
+    # of the rules below on its own terms, e.g. strict-raw-types).
+    - "**/*.freezed.dart"
+    - "**/*.gr.dart"
+    - "**/*.g.dart"
+
+  language:
+    # Every implicit `dynamic` in this codebase is now a deliberate choice
+    # rather than a gap: casts, inference and raw generic types are all
+    # checked. Clean against hand-written code with no fallout.
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+
+  errors:
+    # These are all WARNING by default (verified empirically: an unused
+    # import/local/element/dead branch does not fail `flutter analyze` on
+    # its own). In a finished app sitting at 100% coverage, any of them is
+    # a genuine defect (dead code, a forgotten variable, drift after a
+    # refactor) rather than a style nit, so they are promoted to `error`
+    # here to make sure a CI pipeline that only gates on `error` still
+    # catches them.
+    unused_import: error
+    unused_local_variable: error
+    unused_element: error
+    unused_field: error
+    dead_code: error
+    # A dropped Future is exactly the class of bug this app's async turn
+    # cycle (GameNotifier.playAt awaiting the robot's delay) is vulnerable
+    # to: a silently-unawaited call would desync `state` from the game.
+    # Promoted alongside enabling the lint rule itself, below.
+    unawaited_futures: error
+
+# Formatter page width is Dart's default (80). Declared explicitly so it
+# reads as an intentional decision, not an accident of the default. The
+# codebase was already formatted at 80 before this line was added, so this
+# is a zero-reflow declaration (verified: `dart format` reports 0 changed
+# both before and after).
+formatter:
+  page_width: 80
+
+linter:
+  # The lint rules applied to this project can be customized in the
+  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
+  # included above or to enable additional rules. A list of all available lints
+  # and their documentation is published at https://dart.dev/lints.
+  rules:
+    # --- Enabled on top of flutter_lints ---------------------------------
+
+    # Every function/method in lib and test already declares its return
+    # type; this keeps it that way as the codebase grows.
+    always_declare_return_types: true
+
+    # Pairs with strict-raw-types/strict-inference above: forbids calling
+    # through a `dynamic`-typed receiver, so a typo can't silently become
+    # a runtime NoSuchMethodError. No hand-written code touches `dynamic`.
+    avoid_dynamic_calls: true
+
+    # A value passed that already equals the parameter's default is either
+    # leftover from a refactor or misleads a reader into thinking it
+    # matters. No hand-written call site does this.
+    avoid_redundant_argument_values: true
+
+    # Import blocks (dart:, package:, relative) are already consistently
+    # ordered and blank-line-separated across lib; this keeps future
+    # imports from drifting.
+    directives_ordering: true
+
+    # Every local variable that is never reassigned is already declared
+    # `final` (mutable loop counters like `for (var index = 0; ...)` are
+    # unaffected: they're reassigned by the loop itself).
+    prefer_final_locals: true
+
+    # No hand-written `for (var x in xs)` loop reassigns its loop variable;
+    # they're all already `for (final x in xs)`.
+    prefer_final_in_for_each: true
+
+    # The one deliberate exception (double quotes to avoid escaping an
+    # apostrophe, e.g. "the robot's O") is left alone by this rule, since
+    # it only flags a double-quoted string that has no single quote to
+    # avoid. Fixed the one incidental double-quoted string that had no such
+    # reason.
+    prefer_single_quotes: true
+
+    # Multi-line calls and parameter lists are already trailing-comma'd
+    # throughout (`dart format` at width 80 enforces this shape anyway);
+    # this makes it a lint failure instead of a purely cosmetic drift.
+    require_trailing_commas: true
+
+    # pubspec.yaml's dependencies/dev_dependencies are now alphabetized
+    # (fixed as part of this change) and this keeps them that way.
+    sort_pub_dependencies: true
+
+    # No redundant parenthesization in hand-written code.
+    unnecessary_parenthesis: true
+
+    # See the `errors:` promotion above for why this one also gets
+    # `error` severity, not just enabled.
+    unawaited_futures: true
+
+    # Every subclass constructor that only forwards to `super.key` (or
+    # similar) already uses `super.key` rather than repeating a `Key? key`
+    # parameter and passing it on.
+    use_super_parameters: true
+
+    # --- Considered and rejected ------------------------------------------
+
+    # NOT enabled: one_member_abstracts.
+    # This codebase deliberately declares single-method ports
+    # (`RobotStrategy.chooseMove`, and `GameRepository`, which is close
+    # enough in spirit with its two tightly-related methods) as abstract
+    # interface classes. That's the clean-architecture seam between domain
+    # and data/presentation, not an accident of not having reached for a
+    # function type yet, and the lint's suggested fix (replace the
+    # interface with a plain function type) would erase that seam and the
+    # `implements`-based test doubles (`StubRobotStrategy`,
+    # `FakeGameRepository`) along with it. Left off on purpose.
+
+    # NOT enabled: public_member_api_docs.
+    # Meant for published packages with an external API surface. This is
+    # an app, not a package; enabling it would force doc comments onto
+    # every widget/provider constructor and field for no reader's benefit
+    # and would fight the codebase's existing (deliberately sparser)
+    # doc-comment style, which documents *why*, not every public symbol.
+
+    # NOT enabled: diagnostic_describe_all_properties.
+    # Would require every widget field to be mirrored into
+    # `debugFillProperties` purely for DevTools inspection. Disproportionate
+    # ceremony for a five-screen app with no complex widget state to debug
+    # this way.
